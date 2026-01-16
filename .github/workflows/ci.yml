@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+      - name: Install dependencies
+        run: pnpm install
+      - name: Build
+        run: pnpm --filter levity build
+      - name: Test
+        run: pnpm --filter levity test:coverage
+      - name: Check bundle size
+        run: |
+          SIZE=$(gzip -c packages/core/dist/index.js | wc -c)
+          echo "Bundle size: $SIZE bytes"
+          if [ $SIZE -gt 5120 ]; then
+            echo "Bundle size exceeds 5KB limit!"
+            exit 1
+          fi
