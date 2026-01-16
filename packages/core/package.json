@@ -1,0 +1,44 @@
+{
+  "name": "levity",
+  "version": "0.1.0",
+  "description": "Cross-device sync for Chrome extensions. No backend required.",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "sync",
+    "chrome-extension",
+    "storage",
+    "cross-device",
+    "lightweight"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AlphaLeonX/levity"
+  },
+  "homepage": "https://github.com/AlphaLeonX/levity#readme",
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "chrome-types": "^0.1.413",
+    "tsup": "^8.0.1",
+    "typescript": "^5.3.3"
+  }
+}

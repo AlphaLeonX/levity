@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "Levity Notes",
+  "description": "A simple cross-device synced notes app powered by Levity",
+  "version": "0.1.0",
+  "permissions": ["storage", "sidePanel"],
+  "side_panel": {
+    "default_path": "sidepanel/index.html"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Open Levity Notes"
+  },
+  "icons": {
+    "16": "icons/icon16.svg",
+    "48": "icons/icon48.svg",
+    "128": "icons/icon128.svg"
+  }
+}
