@@ -44,6 +44,6 @@
     "chrome-types": "^0.1.413",
     "tsup": "^8.0.1",
     "typescript": "^5.3.3",
-    "vitest": "^4.0.16"
+    "vitest": "^4.0.17"
   }
 }
