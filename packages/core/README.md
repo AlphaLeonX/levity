@@ -111,6 +111,71 @@ Chrome Storage Sync limits:
 - Per key: ~8KB
 - Writes: ~120/min
 
+## Troubleshooting
+
+### "chrome is not defined"
+
+Levity requires Chrome extension environment. It won't work in regular web pages.
+
+### Data not syncing
+
+1. Check you're logged into Chrome with same account on both devices
+2. Verify Chrome sync is enabled: `chrome://settings/syncSetup`
+3. Check quota: `await store.getQuota()`
+
+### Quota exceeded
+
+Chrome Storage Sync has ~100KB limit. Options:
+
+- Store less data
+- Use `chrome.storage.local` for large data (no sync)
+- Implement data pruning with `onQuotaWarning`
+
+```typescript
+createStore({
+  initial: { ... },
+  onQuotaWarning: (quota) => {
+    if (quota.percent > 90) {
+      // Prune old data
+    }
+  },
+});
+```
+
+### Conflicts losing data
+
+Default is last-write-wins. For important data, implement merge logic:
+
+```typescript
+createStore({
+  initial: { ... },
+  onConflict: ({ local, remote, key }) => {
+    if (key === 'notes') {
+      // Merge arrays
+      return [...new Set([...local, ...remote])];
+    }
+    return remote;
+  },
+});
+```
+
+## TypeScript
+
+Full type inference from `initial`:
+
+```typescript
+const store = createStore({
+  initial: {
+    count: 0,
+    items: [] as string[],
+  },
+});
+
+store.get('count');  // number
+store.get('items');  // string[]
+store.set('count', 'wrong');  // Type error
+```
+
 ## License
 
 MIT
