@@ -59,6 +59,8 @@ describe('PersistQueue', () => {
         storageKey: 'test:state',
         metaKey: 'test:meta',
         onError,
+        maxRetries: 3,
+        retryDelay: 1000,
       });
 
       const originalSet = chrome.storage.sync.set;
@@ -67,9 +69,45 @@ describe('PersistQueue', () => {
       };
 
       badQueue.queue({ notes: ['fail'] });
-      await badQueue.flush();
+      const flushPromise = badQueue.flush();
+
+      // Advance timers for retry delays (1000ms, 2000ms for attempts 2 and 3)
+      await vi.advanceTimersByTimeAsync(1000);
+      await vi.advanceTimersByTimeAsync(2000);
+      await flushPromise;
 
       expect(onError).toHaveBeenCalled();
+      chrome.storage.sync.set = originalSet;
+    });
+  });
+
+  describe('retry logic', () => {
+    it('retries failed writes up to 3 times', async () => {
+      let attempts = 0;
+      const originalSet = chrome.storage.sync.set;
+      chrome.storage.sync.set = async (items) => {
+        attempts++;
+        if (attempts < 3) throw new Error('Temporary failure');
+        return originalSet(items);
+      };
+
+      const retryQueue = new PersistQueue({
+        debounce: 100,
+        storageKey: 'test:state',
+        metaKey: 'test:meta',
+        maxRetries: 3,
+        retryDelay: 1000,
+      });
+
+      retryQueue.queue({ notes: ['retry'] });
+      const flushPromise = retryQueue.flush();
+
+      // Advance timers for retry delays (1000ms after first failure, 2000ms after second)
+      await vi.advanceTimersByTimeAsync(1000);
+      await vi.advanceTimersByTimeAsync(2000);
+      await flushPromise;
+
+      expect(attempts).toBe(3);
       chrome.storage.sync.set = originalSet;
     });
   });

@@ -7,6 +7,8 @@ export interface PersistQueueOptions {
   debounce: number;
   storageKey: string;
   metaKey: string;
+  maxRetries?: number;
+  retryDelay?: number;
   onError?: (error: Error) => void;
 }
 
@@ -14,21 +16,22 @@ export class PersistQueue<T extends Record<string, unknown>> {
   private pendingData: Partial<T> | null = null;
   private timeoutId: ReturnType<typeof setTimeout> | null = null;
   private isFlushing = false;
-  private options: PersistQueueOptions;
+  private options: Required<Omit<PersistQueueOptions, 'onError'>> & Pick<PersistQueueOptions, 'onError'>;
 
   constructor(options: PersistQueueOptions) {
-    this.options = options;
+    this.options = {
+      maxRetries: 3,
+      retryDelay: 1000,
+      ...options,
+    };
   }
 
-  /** Queue data for persistence */
   queue(data: Partial<T>): void {
-    // Merge with pending data
     this.pendingData = {
       ...this.pendingData,
       ...data,
     } as Partial<T>;
 
-    // Reset debounce timer
     if (this.timeoutId) {
       clearTimeout(this.timeoutId);
     }
@@ -38,7 +41,6 @@ export class PersistQueue<T extends Record<string, unknown>> {
     }, this.options.debounce);
   }
 
-  /** Immediately flush pending data */
   async flush(): Promise<void> {
     if (this.timeoutId) {
       clearTimeout(this.timeoutId);
@@ -53,48 +55,59 @@ export class PersistQueue<T extends Record<string, unknown>> {
     const dataToWrite = this.pendingData;
     this.pendingData = null;
 
-    try {
-      // Get current state from storage
-      const result = await chrome.storage.sync.get([this.options.storageKey]);
-      const currentState = (result[this.options.storageKey] as T) || {};
+    let lastError: Error | null = null;
 
-      // Merge with pending changes
-      const newState = {
-        ...currentState,
-        ...dataToWrite,
-      };
+    for (let attempt = 0; attempt < this.options.maxRetries; attempt++) {
+      try {
+        const result = await chrome.storage.sync.get([this.options.storageKey]);
+        const currentState = (result[this.options.storageKey] as T) || {};
 
-      // Write back to storage
-      await chrome.storage.sync.set({
-        [this.options.storageKey]: newState,
-        [this.options.metaKey]: {
-          version: 1,
-          updatedAt: Date.now(),
-        },
-      });
-    } catch (error) {
-      // Put data back for retry
-      this.pendingData = {
-        ...dataToWrite,
-        ...this.pendingData,
-      } as Partial<T>;
+        const newState = {
+          ...currentState,
+          ...dataToWrite,
+        };
 
-      if (this.options.onError) {
-        this.options.onError(error as Error);
-      } else {
-        console.error('[Levity] Persist error:', error);
+        await chrome.storage.sync.set({
+          [this.options.storageKey]: newState,
+          [this.options.metaKey]: {
+            version: 1,
+            updatedAt: Date.now(),
+          },
+        });
+
+        this.isFlushing = false;
+        return; // Success
+      } catch (error) {
+        lastError = error as Error;
+        if (attempt < this.options.maxRetries - 1) {
+          await this.delay(this.options.retryDelay * (attempt + 1));
+        }
       }
-    } finally {
-      this.isFlushing = false;
     }
+
+    // All retries failed
+    this.pendingData = {
+      ...dataToWrite,
+      ...this.pendingData,
+    } as Partial<T>;
+
+    if (this.options.onError) {
+      this.options.onError(lastError!);
+    } else {
+      console.error('[Levity] Persist error after retries:', lastError);
+    }
+
+    this.isFlushing = false;
   }
 
-  /** Check if there's pending data */
+  private delay(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
   hasPending(): boolean {
     return this.pendingData !== null;
   }
 
-  /** Get flush status */
   isBusy(): boolean {
     return this.isFlushing;
   }
