@@ -1,6 +1,6 @@
 {
   "name": "levity",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Cross-device sync for Chrome extensions. No backend required.",
   "type": "module",
   "main": "./dist/index.cjs",
